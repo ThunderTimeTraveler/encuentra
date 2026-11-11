@@ -7,3 +7,5 @@ app/build/
 .kotlin/
 *.jks
 keystore.properties
+*.keystore
+firma/

@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
@@ -17,13 +19,30 @@ android {
         versionName = "0.2.0"
     }
 
+    // La llave con la que se firmaron TODAS las versiones publicadas. Vive fuera
+    // del repo (keystore.properties, ver keystore.properties.ejemplo). Sin ella
+    // el release sale SIN firmar en vez de firmarse con otra llave a escondidas:
+    // un APK con otra firma no se instala encima del que la gente ya tiene.
+    val propsFirma = Properties().apply {
+        val archivo = rootProject.file("keystore.properties")
+        if (archivo.exists()) archivo.inputStream().use { load(it) }
+    }
+    val hayFirma = propsFirma.getProperty("storeFile") != null
+    signingConfigs {
+        create("encuentra") {
+            if (hayFirma) {
+                storeFile = rootProject.file(propsFirma.getProperty("storeFile"))
+                storePassword = propsFirma.getProperty("storePassword")
+                keyAlias = propsFirma.getProperty("keyAlias")
+                keyPassword = propsFirma.getProperty("keyPassword")
+            }
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = false
-            // Sin keystore propio todavia: se firma con la llave de debug para
-            // poder instalarlo. Un release no debuggable se siente mucho mas
-            // rapido que el debug con Compose instrumentado.
-            signingConfig = signingConfigs.getByName("debug")
+            if (hayFirma) signingConfig = signingConfigs.getByName("encuentra")
         }
     }
 
