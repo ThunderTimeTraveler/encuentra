@@ -38,6 +38,8 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Info
+import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Share
@@ -149,6 +151,7 @@ private fun PantallaLista(modelo: Modelo) {
     var seleccion by remember { mutableStateOf(emptySet<String>()) }
     var detalle by remember { mutableStateOf<Entrada?>(null) }
     var porBorrar by remember { mutableStateOf<List<Archivo>?>(null) }
+    var diagnostico by remember { mutableStateOf<String?>(null) }
 
     val visibles = remember(estado.entradas, consulta, filtro) {
         val palabras = Archivo.normalizar(consulta).split(' ').filter { it.isNotBlank() }
@@ -206,6 +209,9 @@ private fun PantallaLista(modelo: Modelo) {
                         IconButton(onClick = { modelo.actualizar(completo = true) }) {
                             Icon(Icons.Default.Refresh, "Buscar de nuevo")
                         }
+                        IconButton(onClick = {
+                            alcance.launch { diagnostico = modelo.diagnostico() }
+                        }) { Icon(Icons.Default.Info, "Diagnóstico") }
                     }
                 } else {
                     Row(Modifier.padding(horizontal = 4.dp).height(56.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -319,6 +325,23 @@ private fun PantallaLista(modelo: Modelo) {
                 alBorrar = { porBorrar = it },
             )
         }
+    }
+
+    diagnostico?.let { texto ->
+        AlertDialog(
+            onDismissRequest = { diagnostico = null },
+            title = { Text("Diagnóstico") },
+            text = {
+                SelectionContainer {
+                    Text(
+                        texto,
+                        Modifier.verticalScroll(rememberScrollState()),
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                }
+            },
+            confirmButton = { TextButton(onClick = { diagnostico = null }) { Text("Cerrar") } },
+        )
     }
 
     porBorrar?.let { archivos ->

@@ -39,11 +39,90 @@ class Catalogo(private val contexto: Context) {
         return encontrados
     }
 
-    /** Lo que el indice no tenia, buscando carpeta por carpeta. */
-    fun fueraDelIndice(yaVistos: Set<String>): List<Archivo> {
+    /**
+     * Lo que el indice no tenia, buscando carpeta por carpeta.
+     *
+     * Primero las carpetas de las apps de mensajes, ENTRANDO DIRECTO a ellas:
+     * desde Android 11 viven en `Android/media/<app>`, y en algunos telefonos
+     * listar `Android` no devuelve nada aunque sus hijas si se puedan leer.
+     */
+    fun deMensajeria(yaVistos: Set<String>, visitadas: MutableSet<String>): List<Archivo> {
         val extra = ArrayList<Archivo>()
-        for (raiz in raices()) recorrer(raiz, yaVistos, extra, profundidad = 0)
+        for (raiz in raices()) {
+            for (c in carpetasDeMensajeria(raiz)) recorrer(c, yaVistos, extra, 0, visitadas)
+        }
         return extra
+    }
+
+    /** Todo lo demas. [visitadas] trae las carpetas ya recorridas en [deMensajeria]. */
+    fun fueraDelIndice(yaVistos: Set<String>, visitadas: MutableSet<String>): List<Archivo> {
+        val extra = ArrayList<Archivo>()
+        for (raiz in raices()) recorrer(raiz, yaVistos, extra, 0, visitadas)
+        return extra
+    }
+
+    private fun carpetasDeMensajeria(raiz: File): List<File> = listOf(
+        File(raiz, "Android/media/com.whatsapp"),
+        File(raiz, "Android/media/com.whatsapp.w4b"),
+        File(raiz, "Android/media/org.telegram.messenger"),
+        File(raiz, "Android/media/org.telegram.messenger.web"),
+        File(raiz, "WhatsApp"),
+        File(raiz, "WhatsApp Business"),
+        File(raiz, "Telegram"),
+    ).filter { it.isDirectory }
+
+    /**
+     * Que ve la app, en texto, para entender por que falta algo: si cada
+     * memoria y cada carpeta de mensajeria se puede leer y cuantos archivos hay.
+     */
+    fun diagnostico(): String = buildString {
+        appendLine("Acceso a todos los archivos: " + if (Environment.isExternalStorageManager()) "sí" else "NO")
+        appendLine("Android ${android.os.Build.VERSION.RELEASE} (API ${android.os.Build.VERSION.SDK_INT})")
+        for (raiz in raices()) {
+            appendLine()
+            appendLine("Memoria: ${raiz.absolutePath}")
+            appendLine("  se puede listar: " + (raiz.listFiles()?.size?.let { "sí ($it elementos)" } ?: "NO"))
+            val android = File(raiz, "Android")
+            appendLine("  Android/: " + (android.listFiles()?.joinToString { it.name } ?: "NO se puede listar"))
+            val media = File(raiz, "Android/media")
+            appendLine("  Android/media/: " + (media.listFiles()?.size?.let { "$it carpetas" } ?: "NO se puede listar"))
+            for (nombre in listOf("com.whatsapp", "com.whatsapp.w4b", "org.telegram.messenger")) {
+                val c = File(media, nombre)
+                if (!c.exists()) {
+                    appendLine("  $nombre: no existe")
+                    continue
+                }
+                appendLine("  $nombre: " + (c.listFiles()?.let { "se lee, ${contar(c)} archivos" } ?: "existe pero NO se puede leer"))
+            }
+        }
+        appendLine()
+        appendLine("En el índice de Android con «whatsapp» en la ruta: ${contarEnIndice("%whatsapp%")}")
+    }
+
+    private fun contar(carpeta: File, profundidad: Int = 0): Int {
+        if (profundidad > 25) return 0
+        var n = 0
+        for (f in carpeta.listFiles() ?: return 0) {
+            n += if (f.isDirectory) contar(f, profundidad + 1) else 1
+        }
+        return n
+    }
+
+    private fun contarEnIndice(patron: String): Int {
+        var total = 0
+        for (volumen in MediaStore.getExternalVolumeNames(contexto)) {
+            try {
+                contexto.contentResolver.query(
+                    MediaStore.Files.getContentUri(volumen),
+                    arrayOf(MediaStore.Files.FileColumns._ID),
+                    "${MediaStore.Files.FileColumns.DATA} LIKE ?",
+                    arrayOf(patron),
+                    null,
+                )?.use { total += it.count }
+            } catch (_: Exception) {
+            }
+        }
+        return total
     }
 
     private fun leerVolumen(volumen: String, descargas: Map<Long, String>, salida: MutableList<Archivo>) {
@@ -139,13 +218,25 @@ class Catalogo(private val contexto: Context) {
         return raices.filter { it.isDirectory }
     }
 
-    private fun recorrer(carpeta: File, yaVistos: Set<String>, salida: MutableList<Archivo>, profundidad: Int) {
+    private fun recorrer(
+        carpeta: File,
+        yaVistos: Set<String>,
+        salida: MutableList<Archivo>,
+        profundidad: Int,
+        visitadas: MutableSet<String>,
+    ) {
         if (profundidad > 25) return
-        val hijos = carpeta.listFiles() ?: return
+        // Cada carpeta una sola vez: las de mensajeria se recorren primero y no se repiten.
+        if (!visitadas.add(carpeta.absolutePath)) return
+        val hijos = try {
+            carpeta.listFiles()
+        } catch (_: SecurityException) {
+            null
+        } ?: return
         for (f in hijos) {
             if (f.name.startsWith(".")) continue
             if (f.isDirectory) {
-                if (!esPrivada(f.absolutePath)) recorrer(f, yaVistos, salida, profundidad + 1)
+                if (!esPrivada(f.absolutePath)) recorrer(f, yaVistos, salida, profundidad + 1, visitadas)
                 continue
             }
             val ruta = f.absolutePath

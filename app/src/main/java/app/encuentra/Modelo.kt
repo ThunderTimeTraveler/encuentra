@@ -55,7 +55,11 @@ class Modelo(app: Application) : AndroidViewModel(app) {
             if (!toca) return@launch
             _estado.update { it.copy(revisando = true) }
 
-            extras = withContext(Dispatchers.IO) { catalogo.fueraDelIndice(vistos) }
+            val visitadas = HashSet<String>()
+            val mensajeria = withContext(Dispatchers.IO) { catalogo.deMensajeria(vistos, visitadas) }
+            publicar(indice + mensajeria, grupos, cargando = false, revisando = true)
+            val resto = withContext(Dispatchers.IO) { catalogo.fueraDelIndice(vistos, visitadas) }
+            extras = mensajeria + resto
             val todos = indice + extras
             publicar(todos, grupos, cargando = false, revisando = true)
 
@@ -65,6 +69,16 @@ class Modelo(app: Application) : AndroidViewModel(app) {
             ultimaRevisionCompleta = SystemClock.elapsedRealtime()
             publicar(todos, grupos, cargando = false, revisando = false)
         }
+    }
+
+    /** Que ve la app (permisos, carpetas de WhatsApp...), para mostrarlo en pantalla. */
+    suspend fun diagnostico(): String = withContext(Dispatchers.IO) {
+        val e = _estado.value
+        val porOrigen = e.entradas.flatMap { it.todas }.groupingBy { it.origen }.eachCount()
+            .entries.sortedByDescending { it.value }.take(12)
+            .joinToString("\n") { "  ${it.key}: ${it.value}" }
+        catalogo.diagnostico() + "\nEn la lista ahora: ${e.entradas.size} renglones" +
+            (if (e.revisando) " (todavía revisando)" else "") + "\n" + porOrigen
     }
 
     /** Despues de borrar: se quitan de la lista sin volver a buscar todo. */
