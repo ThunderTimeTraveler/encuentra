@@ -26,9 +26,9 @@ Nada sale del teléfono: la app no pide permiso de internet.
    pon `JAVA_HOME` y `ANDROID_HOME`.
 2. Instala Git, Node y `gh` (GitHub CLI), y entra con `gh auth login`.
 3. Clona este repo y, al lado, `vowat-energy/vowatapp` (carpeta `../vowatapp`).
-4. **La llave de firma** (no está en el repo): pon `encuentra-firma.keystore` en
+4. **Opcional, para firmar en esta máquina** (si no, firma GitHub): pon `encuentra-firma.keystore` en
    `firma/` y copia `keystore.properties.ejemplo` como `keystore.properties`.
-   Sin ella el release sale sin firmar y `publicar.sh` se niega a subirlo.
+   Sin la llave, `compilar.sh` deja el release sin firmar (no se instala).
 
 ## Compilar
 
@@ -41,14 +41,24 @@ El APK sale en `app/build/outputs/apk/release/app-release.apk`.
 ## Publicar una versión
 
 1. Sube `versionCode` y `versionName` en `app/build.gradle.kts` y haz commit.
-2. `sh scripts/publicar.sh`: prueba. Compila y comprueba la firma, sin subir nada.
-3. `sh scripts/publicar.sh --publicar`: release en GitHub y PR en vowatapp.
-   Con `--juntar` además junta el PR a main y sale en la sección de apps de
-   vowat.com.mx cuando Vercel termina.
+2. `sh scripts/publicar.sh`: prueba, no sube nada.
+3. `sh scripts/publicar.sh --publicar --juntar`: release en GitHub, PR en
+   vowatapp y juntado a main. Sale en la sección de apps de vowat.com.mx
+   cuando Vercel termina (unos minutos).
+
+**Quién firma.** Si la máquina tiene `keystore.properties`, firma ella. Si no,
+firma **GitHub** (`.github/workflows/publicar.yml`) con la llave guardada como
+secreto cifrado del repo (`FIRMA_KEYSTORE_B64`). Así cualquier computadora con
+`gh` puede publicar sin tener la llave. El script sube la etiqueta `vX.Y.Z`,
+espera a que GitHub cree la release y baja el APK de ahí para vowat.
+
+Para la parte de vowat hacen falta Node, un clon de `vowat-energy/vowatapp` en
+`../vowatapp` y las build-tools del SDK de Android (las usa
+`publicar-app.mjs` para medir el APK).
 
 La firma tiene que ser siempre la misma (SHA-256
 `ff5bead462bfb4da481d87e4e9db532d5493c136c408ecf35a22be89b3d94615`); si no, el
-APK no se instala encima del anterior y el script no publica.
+APK no se instala encima del anterior, y ni GitHub ni el script la publican.
 
 ## Por dentro
 
