@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Una lupa sobre una hoja. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp" android:height="108dp"
+    android:viewportWidth="108" android:viewportHeight="108">
+    <path android:fillColor="#FFFFFF"
+        android:pathData="M36,30h26l10,10v16a18,18 0,0 0,-6 -1a18,18 0,0 0,-18 18a18,18 0,0 0,1 6H36z" />
+    <path android:strokeColor="#FFFFFF" android:strokeWidth="5" android:fillColor="#00000000"
+        android:pathData="M66,73m-11,0a11,11 0,1 1,22 0a11,11 0,1 1,-22 0" />
+    <path android:strokeColor="#FFFFFF" android:strokeWidth="6" android:strokeLineCap="round"
+        android:pathData="M74,81L82,89" />
+</vector>
